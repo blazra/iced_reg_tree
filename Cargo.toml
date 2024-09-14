@@ -1,0 +1,10 @@
+[package]
+name = "iced_reg_tree"
+version = "0.1.0"
+authors = ["Radovan Blažek <blazra@gmail.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+iced = { git = "https://github.com/iced-rs/iced" }
+svd-parser = "0.14.6"
