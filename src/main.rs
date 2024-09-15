@@ -1,4 +1,3 @@
-
 use svd_parser as svd;
 
 use std::fs::File;
@@ -7,8 +6,10 @@ use std::io::Read;
 use iced::widget::{column, Column};
 use iced::{Font, Task};
 
+pub mod field;
 pub mod reg16;
-use reg16::{EnumValue, Field, Reg16, ValState};
+use field::Field;
+use reg16::{EnumValue, Reg16, ValState};
 
 pub fn main() -> iced::Result {
     iced::application("Iced Reg Tree", App::update, App::view)
@@ -51,6 +52,8 @@ impl App {
                     fields.push(Field {
                         name: field.name.clone(),
                         description: field.description.clone(),
+                        value: 0,
+                        write_value: String::from("0x0000"),
                         state: ValState::None,
                         offset: field.bit_range.offset as u8,
                         width: field.bit_range.width as u8,
@@ -62,7 +65,7 @@ impl App {
                     description: reg.description.clone(),
                     expanded: false,
                     state: ValState::None,
-                    value: 0x0000,
+                    value: 0,
                     write_value: String::from("0x0000"),
                     fields,
                 })
@@ -74,15 +77,28 @@ impl App {
 
     fn update(&mut self, message: Message) {
         match message {
-            Message::Reg(i, msg) => {
+            Message::Reg(idx, msg) => {
                 if matches!(msg, reg16::Message::Select) {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
-                        if i != j {
+                        if idx != j {
                             reg.state = ValState::None;
+                        }
+                        for field in reg.fields.iter_mut() {
+                            field.state = ValState::None;
                         }
                     }
                 }
-                self.regs[i].update(msg)
+                if let reg16::Message::FieldChanged(field_idx, field::Message::Select) = msg {
+                    for (j, reg) in self.regs.iter_mut().enumerate() {
+                        reg.state = ValState::None;
+                        for (k, field) in reg.fields.iter_mut().enumerate() {
+                            if !(idx == j && field_idx == k) {
+                                field.state = ValState::None;
+                            }
+                        }
+                    }
+                }
+                self.regs[idx].update(msg)
             }
         }
     }
