@@ -3,7 +3,7 @@ use svd_parser as svd;
 use std::fs::File;
 use std::io::Read;
 
-use iced::widget::{column, Column};
+use iced::widget::{column, text_input, Column};
 use iced::{Font, Task};
 
 pub mod field;
@@ -68,6 +68,7 @@ impl App {
                     value: 0,
                     write_value: String::from("0x0000"),
                     fields,
+                    input_id: text_input::Id::unique(),
                 })
             }
         }
@@ -75,10 +76,10 @@ impl App {
         (App { regs }, Task::none())
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Reg(idx, msg) => {
-                if matches!(msg, reg16::Message::Select) {
+                if let reg16::Message::Select(id) = msg {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         if idx != j {
                             reg.state = ValState::None;
@@ -87,8 +88,9 @@ impl App {
                             field.state = ValState::None;
                         }
                     }
-                }
-                if let reg16::Message::FieldChanged(field_idx, field::Message::Select) = msg {
+                    self.regs[idx].update(reg16::Message::Select(id.clone()));
+                    return text_input::focus(id.clone());
+                } else if let reg16::Message::FieldChanged(field_idx, field::Message::Select) = msg {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         reg.state = ValState::None;
                         for (k, field) in reg.fields.iter_mut().enumerate() {
@@ -97,10 +99,13 @@ impl App {
                             }
                         }
                     }
+                    self.regs[idx].update(msg);
+                } else {
+                    self.regs[idx].update(msg);
                 }
-                self.regs[idx].update(msg)
             }
         }
+        Task::none()
     }
 
     fn view(&self) -> Column<Message> {

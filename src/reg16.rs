@@ -2,7 +2,7 @@ use std::num::ParseIntError;
 
 use iced::alignment::Vertical::Top;
 use iced::widget::{button, column, row, text, text_input, Button};
-use iced::{color, Element, Renderer, Theme};
+use iced::{color, Element, Renderer, Task, Theme};
 
 use crate::field;
 use crate::field::Field;
@@ -22,12 +22,13 @@ pub struct Reg16 {
     pub value: u16,
     pub write_value: String,
     pub fields: Vec<Field>,
+    pub input_id: text_input::Id,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleExpand,
-    Select,
+    Select(text_input::Id),
     InputChanged(String),
     WriteValueSubmit,
     FieldChanged(usize, field::Message),
@@ -41,11 +42,14 @@ pub struct EnumValue {
 }
 
 impl Reg16 {
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ToggleExpand => self.expanded = !self.expanded,
-            Message::Select => match self.state {
-                ValState::None => self.state = ValState::Selected,
+            Message::Select(id) => match self.state {
+                ValState::None => {
+                    self.state = ValState::Selected;
+                    return text_input::focus(id);
+                },
                 ValState::Selected => self.state = ValState::Editing,
                 ValState::Editing => (),
             },
@@ -81,18 +85,12 @@ impl Reg16 {
                 }
             },
         }
+        Task::none()
     }
 
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
         let but_text = if self.expanded { "-" } else { "+" };
-        let read_value = value_button(
-            format!("0x{:04X}", self.value),
-            self.write_value.clone(),
-            self.state.clone(),
-            Some(Message::Select),
-            Message::InputChanged,
-            Message::WriteValueSubmit,
-        );
+        let read_value = self.value_button();
         let mut reg = row![
             text_button(but_text).on_press(Message::ToggleExpand),
             text_button(self.name.as_str()),
@@ -108,45 +106,37 @@ impl Reg16 {
         }
         reg.into()
     }
+
+    fn value_button<'a>(&self) -> Element<'a, Message, Theme, Renderer> {
+        let value = format!("0x{:04X}", self.value);
+        let val_but = button(text(value.clone()))
+                .style(button::text)
+                .padding(0)
+                .on_press(Message::Select(self.input_id.clone()));
+        match self.state {
+            ValState::Editing => {
+                let val_input = text_input(value.as_str(), self.write_value.as_str()).id(self.input_id.clone())
+                .width(100)
+                .on_input(Message::InputChanged)
+                .on_submit(Message::WriteValueSubmit);
+                column![
+                    val_but,
+                    val_input,
+                ].into()
+            },
+            ValState::None => val_but.into(),
+            ValState::Selected => val_but
+                .style(|theme, status| button::text(theme, status).with_background(color!(0x3399FF)))
+                .into(),
+        }
+    }
+    
 }
 
 fn text_button<'a>(
     content: impl Into<Element<'a, Message, Theme, Renderer>>,
 ) -> Button<'a, Message> {
     button(content).style(button::text).padding(0)
-}
-
-fn value_button<'a>(
-    value: String,
-    write_value: String,
-    state: ValState,
-    on_press: Option<Message>,
-    on_input: impl Fn(String) -> Message + Clone + 'a,
-    on_submit: Message,
-) -> Element<'a, Message, Theme, Renderer> {
-    match state {
-        ValState::Editing => column![
-            button(text(value.clone()))
-                .style(button::text)
-                .padding(0)
-                .on_press_maybe(on_press),
-            text_input(value.as_str(), write_value.as_str())
-                .width(100)
-                .on_input(on_input.clone())
-                .on_submit(on_submit),
-        ]
-        .into(),
-        ValState::None => button(text(value.clone()))
-            .style(button::text)
-            .padding(0)
-            .on_press_maybe(on_press)
-            .into(),
-        ValState::Selected => button(text(value.clone()))
-            .style(|theme, status| button::text(theme, status).with_background(color!(0x3399FF)))
-            .padding(0)
-            .on_press_maybe(on_press)
-            .into(),
-    }
 }
 
 fn from_str_to_u16(src: &str) -> Result<u16, ParseIntError> {
