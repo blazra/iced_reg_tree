@@ -58,6 +58,7 @@ impl App {
                         offset: field.bit_range.offset as u8,
                         width: field.bit_range.width as u8,
                         enum_values,
+                        input_id: text_input::Id::unique(),
                     });
                 }
                 regs.push(Reg16 {
@@ -90,7 +91,9 @@ impl App {
                     }
                     self.regs[idx].update(reg16::Message::Select(id.clone()));
                     return text_input::focus(id.clone());
-                } else if let reg16::Message::FieldChanged(field_idx, field::Message::Select) = msg {
+                } else if let reg16::Message::FieldChanged(field_idx, field::Message::Select(id)) =
+                    msg
+                {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         reg.state = ValState::None;
                         for (k, field) in reg.fields.iter_mut().enumerate() {
@@ -99,7 +102,11 @@ impl App {
                             }
                         }
                     }
-                    self.regs[idx].update(msg);
+                    self.regs[idx].update(reg16::Message::FieldChanged(
+                        field_idx,
+                        field::Message::Select(id.clone()),
+                    ));
+                    return text_input::focus(id.clone());
                 } else {
                     self.regs[idx].update(msg);
                 }

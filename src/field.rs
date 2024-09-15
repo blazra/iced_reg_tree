@@ -14,11 +14,12 @@ pub struct Field {
     pub offset: u8,
     pub width: u8,
     pub enum_values: Vec<EnumValue>,
+    pub input_id: text_input::Id,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Select,
+    Select(text_input::Id),
     InputChanged(String),
     WriteValueSubmit,
 }
@@ -40,7 +41,7 @@ impl Field {
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::Select => {
+            Message::Select(_) => {
                 match self.state {
                     ValState::None => self.state = ValState::Selected,
                     ValState::Selected => self.state = ValState::Editing,
@@ -67,51 +68,33 @@ impl Field {
             13..=16 => format!("0x{:04X}", self.value),
             _ => unreachable!(),
         };
-        let field_val = value_button(
-            field_val,
-            self.write_value.clone(),
-            self.state.clone(),
-            Some(Message::Select),
-            Message::InputChanged,
-            Message::WriteValueSubmit,
-        );
-        let field_row = row![text_button(self.name.as_str()), field_val,].spacing(10);
-        field_row.push_maybe(enum_value).into()
-    }
-}
-
-fn value_button<'a>(
-    value: String,
-    write_value: String,
-    state: ValState,
-    on_press: Option<Message>,
-    on_input: impl Fn(String) -> Message + Clone + 'a,
-    on_submit: Message,
-) -> Element<'a, Message, Theme, Renderer> {
-    match state {
-        ValState::Editing => column![
-            button(text(value.clone()))
+        let field_val = match self.state {
+            ValState::Editing => column![
+                button(text(field_val.clone()))
+                    .style(button::text)
+                    .padding(0)
+                    .on_press(Message::Select(self.input_id.clone())),
+                text_input(field_val.as_str(), self.write_value.as_str())
+                    .width(100)
+                    .on_input(Message::InputChanged)
+                    .on_submit(Message::WriteValueSubmit)
+                    .id(self.input_id.clone()),
+            ],
+            ValState::None => column![
+                button(text(field_val.clone()))
                 .style(button::text)
                 .padding(0)
-                .on_press_maybe(on_press),
-            text_input(value.as_str(), write_value.as_str())
-                .width(100)
-                .on_input(on_input.clone())
-                .on_submit(on_submit),
-        ]
-        .into(),
-        ValState::None => button(text(value.clone()))
-            .style(button::text)
-            .padding(0)
-            .on_press_maybe(on_press)
-            .into(),
-        ValState::Selected => button(text(value.clone()))
-            .style(|theme, status| {
-                button::text(theme, status).with_background(color!(0x3399FF))
-            })
-            .padding(0)
-            .on_press_maybe(on_press)
-            .into(),
+                .on_press(Message::Select(self.input_id.clone()))],
+            ValState::Selected => column![
+                button(text(field_val.clone()))
+                .style(|theme, status| {
+                    button::text(theme, status).with_background(color!(0x3399FF))
+                })
+                .padding(0)
+                .on_press(Message::Select(self.input_id.clone()))],
+        };
+        let field_row = row![text_button(self.name.as_str()), field_val,].spacing(10);
+        field_row.push_maybe(enum_value).into()
     }
 }
 

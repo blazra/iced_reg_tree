@@ -49,7 +49,7 @@ impl Reg16 {
                 ValState::None => {
                     self.state = ValState::Selected;
                     return text_input::focus(id);
-                },
+                }
                 ValState::Selected => self.state = ValState::Editing,
                 ValState::Editing => (),
             },
@@ -64,10 +64,10 @@ impl Reg16 {
                 }
             }
             Message::FieldChanged(index, message) => match message {
-                field::Message::Select => {
+                field::Message::Select(id) => {
                     for (j, field) in self.fields.iter_mut().enumerate() {
                         if j == index {
-                            field.update(field::Message::Select);
+                            field.update(field::Message::Select(id.clone()));
                         } else {
                             field.state = ValState::None;
                         }
@@ -110,27 +110,26 @@ impl Reg16 {
     fn value_button<'a>(&self) -> Element<'a, Message, Theme, Renderer> {
         let value = format!("0x{:04X}", self.value);
         let val_but = button(text(value.clone()))
-                .style(button::text)
-                .padding(0)
-                .on_press(Message::Select(self.input_id.clone()));
+            .style(button::text)
+            .padding(0)
+            .on_press(Message::Select(self.input_id.clone()));
         match self.state {
             ValState::Editing => {
-                let val_input = text_input(value.as_str(), self.write_value.as_str()).id(self.input_id.clone())
-                .width(100)
-                .on_input(Message::InputChanged)
-                .on_submit(Message::WriteValueSubmit);
-                column![
-                    val_but,
-                    val_input,
-                ].into()
-            },
+                let val_input = text_input(value.as_str(), self.write_value.as_str())
+                    .id(self.input_id.clone())
+                    .width(100)
+                    .on_input(Message::InputChanged)
+                    .on_submit(Message::WriteValueSubmit);
+                column![val_but, val_input,].into()
+            }
             ValState::None => val_but.into(),
             ValState::Selected => val_but
-                .style(|theme, status| button::text(theme, status).with_background(color!(0x3399FF)))
+                .style(|theme, status| {
+                    button::text(theme, status).with_background(color!(0x3399FF))
+                })
                 .into(),
         }
     }
-    
 }
 
 fn text_button<'a>(
