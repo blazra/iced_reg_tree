@@ -82,7 +82,8 @@ impl Reg16 {
                             field.set_value_from_reg(self.value)
                         }
                     }
-                }
+                },
+                _ => self.fields[index].update(message)
             },
         }
         Task::none()

@@ -1,10 +1,12 @@
-use iced::widget::{button, column, row, text, text_input, Button};
-use iced::{color, Element, Renderer, Theme};
+use iced::widget::{button, column, horizontal_space, row, text, text_input, Button};
+use iced::{color, Color, Element, Length, Renderer, Theme};
 
 use crate::reg16::EnumValue;
 use crate::reg16::ValState;
 
-#[derive(Debug, Clone)]
+use crate::combo_box::{self, ComboBox};
+
+#[derive(Debug)]
 pub struct Field {
     pub name: String,
     pub value: u16,
@@ -14,6 +16,8 @@ pub struct Field {
     pub offset: u8,
     pub width: u8,
     pub enum_values: Vec<EnumValue>,
+    pub enum_combo_state: combo_box::State<EnumValue>,
+    pub selected_enum: Option<EnumValue>,
     pub input_id: text_input::Id,
 }
 
@@ -22,6 +26,7 @@ pub enum Message {
     Select(text_input::Id),
     InputChanged(String),
     WriteValueSubmit,
+    ValSelected(EnumValue),
 }
 
 impl Field {
@@ -29,27 +34,31 @@ impl Field {
         let mask = !(0xffffu16 << self.width);
         (reg >> self.offset) & mask
     }
-    
+
     pub fn value_reg_from_field(&self, reg: u16, field: u16) -> u16 {
         let mask = (!(0xffffu16 << self.width)) << self.offset;
         ((field << self.offset) & mask) | (reg & !mask)
     }
-    
+
     pub fn set_value_from_reg(&mut self, reg: u16) {
         self.value = self.value_from_reg(reg);
     }
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::Select(_) => {
-                match self.state {
-                    ValState::None => self.state = ValState::Selected,
-                    ValState::Selected => self.state = ValState::Editing,
-                    ValState::Editing => (),
-                }
-            }
-            Message::InputChanged(write_val) => self.write_value = write_val,
+            Message::Select(_) => match self.state {
+                ValState::None => self.state = ValState::Selected,
+                ValState::Selected => self.state = ValState::Editing,
+                ValState::Editing => (),
+            },
+            Message::InputChanged(write_val) => {
+                self.write_value = write_val;
+            },
             Message::WriteValueSubmit => (),
+            Message::ValSelected(val) => {
+                self.write_value = val.value.to_string();
+                self.selected_enum = Some(val);
+            },
         }
     }
 
@@ -68,6 +77,9 @@ impl Field {
             13..=16 => format!("0x{:04X}", self.value),
             _ => unreachable!(),
         };
+        let enum_combobox = ComboBox::new(&self.enum_combo_state, "placeholder", self.selected_enum.as_ref(), Message::ValSelected)
+        .width(100)
+        .on_input(Message::InputChanged);
         let field_val = match self.state {
             ValState::Editing => column![
                 button(text(field_val.clone()))
@@ -79,14 +91,13 @@ impl Field {
                     .on_input(Message::InputChanged)
                     .on_submit(Message::WriteValueSubmit)
                     .id(self.input_id.clone()),
+                enum_combobox,
             ],
-            ValState::None => column![
-                button(text(field_val.clone()))
+            ValState::None => column![button(text(field_val.clone()))
                 .style(button::text)
                 .padding(0)
                 .on_press(Message::Select(self.input_id.clone()))],
-            ValState::Selected => column![
-                button(text(field_val.clone()))
+            ValState::Selected => column![button(text(field_val.clone()).color(Color::WHITE))
                 .style(|theme, status| {
                     button::text(theme, status).with_background(color!(0x3399FF))
                 })
@@ -95,6 +106,12 @@ impl Field {
         };
         let field_row = row![text_button(self.name.as_str()), field_val,].spacing(10);
         field_row.push_maybe(enum_value).into()
+    }
+}
+
+impl std::fmt::Display for EnumValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("{} {}", self.value, self.name).as_str())
     }
 }
 

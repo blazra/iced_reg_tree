@@ -8,6 +8,8 @@ use iced::{Font, Task};
 
 pub mod field;
 pub mod reg16;
+pub mod combo_box;
+
 use field::Field;
 use reg16::{EnumValue, Reg16, ValState};
 
@@ -57,8 +59,10 @@ impl App {
                         state: ValState::None,
                         offset: field.bit_range.offset as u8,
                         width: field.bit_range.width as u8,
-                        enum_values,
+                        enum_values: enum_values.clone(),
                         input_id: text_input::Id::unique(),
+                        enum_combo_state: combo_box::State::new(enum_values.clone()),
+                        selected_enum: None,
                     });
                 }
                 regs.push(Reg16 {
