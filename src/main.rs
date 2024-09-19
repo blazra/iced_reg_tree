@@ -54,8 +54,9 @@ impl App {
                     fields.push(Field {
                         name: field.name.clone(),
                         description: field.description.clone(),
-                        value: 0,
-                        write_value: String::from("0x0000"),
+                        value_read: 0,
+                        value_write: 0,
+                        input_text: String::from("0x0000"),
                         state: ValState::None,
                         offset: field.bit_range.offset as u8,
                         width: field.bit_range.width as u8,
@@ -70,8 +71,9 @@ impl App {
                     description: reg.description.clone(),
                     expanded: false,
                     state: ValState::None,
-                    value: 0,
-                    write_value: String::from("0x0000"),
+                    value_read: 0,
+                    value_write: 0,
+                    input_text: String::from("0x0000"),
                     fields,
                     input_id: text_input::Id::unique(),
                 })

@@ -1,5 +1,5 @@
-use iced::widget::{button, column, horizontal_space, row, text, text_input, Button};
-use iced::{color, Color, Element, Length, Renderer, Theme};
+use iced::widget::{button, column, row, text, text_input, Button};
+use iced::{color, Color, Element, Renderer, Theme};
 
 use crate::reg16::EnumValue;
 use crate::reg16::ValState;
@@ -9,8 +9,9 @@ use crate::combo_box::{self, ComboBox};
 #[derive(Debug)]
 pub struct Field {
     pub name: String,
-    pub value: u16,
-    pub write_value: String,
+    pub value_read: u16,
+    pub value_write: u16,
+    pub input_text: String,
     pub description: Option<String>,
     pub state: ValState,
     pub offset: u8,
@@ -40,8 +41,12 @@ impl Field {
         ((field << self.offset) & mask) | (reg & !mask)
     }
 
-    pub fn set_value_from_reg(&mut self, reg: u16) {
-        self.value = self.value_from_reg(reg);
+    pub fn set_value_read_from_reg(&mut self, reg: u16) {
+        self.value_read = self.value_from_reg(reg);
+    }
+
+    pub fn set_value_write_from_reg(&mut self, reg: u16) {
+        self.value_write = self.value_from_reg(reg);
     }
 
     pub fn update(&mut self, message: Message) {
@@ -51,30 +56,42 @@ impl Field {
                 ValState::Selected => self.state = ValState::Editing,
                 ValState::Editing => (),
             },
-            Message::InputChanged(write_val) => {
-                self.write_value = write_val;
-            },
-            Message::WriteValueSubmit => (),
+            Message::InputChanged(text) => self.input_text = text,
             Message::ValSelected(val) => {
-                self.write_value = val.value.to_string();
+                self.input_text = val.value.to_string();
                 self.selected_enum = Some(val);
             },
+            Message::WriteValueSubmit => (),
         }
     }
 
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
-        let mut enum_value = None;
+        let mut enum_value_read = None;
         for val in self.enum_values.iter() {
-            if val.value == self.value {
-                enum_value = Some(val.name.as_str());
+            if val.value == self.value_read {
+                enum_value_read = Some(val.name.as_str());
             }
         }
-        let field_val = match self.width {
-            1 => format!("{}", self.value),
-            2..=4 => format!("0x{:01X}", self.value),
-            5..=8 => format!("0x{:02X}", self.value),
-            9..=12 => format!("0x{:03X}", self.value),
-            13..=16 => format!("0x{:04X}", self.value),
+        let mut enum_value_write = None;
+        for val in self.enum_values.iter() {
+            if val.value == self.value_write {
+                enum_value_write = Some(val.name.as_str());
+            }
+        }
+        let field_val_read = match self.width {
+            1 => format!("{}", self.value_read),
+            2..=4 => format!("0x{:01X}", self.value_read),
+            5..=8 => format!("0x{:02X}", self.value_read),
+            9..=12 => format!("0x{:03X}", self.value_read),
+            13..=16 => format!("0x{:04X}", self.value_read),
+            _ => unreachable!(),
+        };
+        let field_val_write = match self.width {
+            1 => format!("{}", self.value_write),
+            2..=4 => format!("0x{:01X}", self.value_read),
+            5..=8 => format!("0x{:02X}", self.value_read),
+            9..=12 => format!("0x{:03X}", self.value_read),
+            13..=16 => format!("0x{:04X}", self.value_read),
             _ => unreachable!(),
         };
         let enum_combobox = ComboBox::new(&self.enum_combo_state, "placeholder", self.selected_enum.as_ref(), Message::ValSelected)
@@ -82,30 +99,36 @@ impl Field {
         .on_input(Message::InputChanged);
         let field_val = match self.state {
             ValState::Editing => column![
-                button(text(field_val.clone()))
+                button(text(field_val_read.clone()))
                     .style(button::text)
                     .padding(0)
                     .on_press(Message::Select(self.input_id.clone())),
-                text_input(field_val.as_str(), self.write_value.as_str())
+                text_input(field_val_read.as_str(), self.input_text.as_str())
                     .width(100)
                     .on_input(Message::InputChanged)
                     .on_submit(Message::WriteValueSubmit)
                     .id(self.input_id.clone()),
                 enum_combobox,
             ],
-            ValState::None => column![button(text(field_val.clone()))
+            ValState::None => column![button(text(field_val_read.clone()))
                 .style(button::text)
                 .padding(0)
                 .on_press(Message::Select(self.input_id.clone()))],
-            ValState::Selected => column![button(text(field_val.clone()).color(Color::WHITE))
+            ValState::Selected => column![button(text(field_val_read.clone()).color(Color::WHITE))
                 .style(|theme, status| {
                     button::text(theme, status).with_background(color!(0x3399FF))
                 })
                 .padding(0)
                 .on_press(Message::Select(self.input_id.clone()))],
         };
-        let field_row = row![text_button(self.name.as_str()), field_val,].spacing(10);
-        field_row.push_maybe(enum_value).into()
+        let mut field_row = row![text_button(self.name.as_str()), field_val,].spacing(10);
+        field_row = field_row.push_maybe(enum_value_read);
+        if self.value_write != self.value_read {
+            field_row = field_row.push("->");
+            field_row = field_row.push(text(field_val_write));
+            field_row = field_row.push_maybe(enum_value_write);
+        }
+        field_row.into()
     }
 }
 

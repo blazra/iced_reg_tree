@@ -19,8 +19,9 @@ pub struct Reg16 {
     pub description: Option<String>,
     pub expanded: bool,
     pub state: ValState,
-    pub value: u16,
-    pub write_value: String,
+    pub value_read: u16,
+    pub value_write: u16,
+    pub input_text: String,
     pub fields: Vec<Field>,
     pub input_id: text_input::Id,
 }
@@ -53,13 +54,13 @@ impl Reg16 {
                 ValState::Selected => self.state = ValState::Editing,
                 ValState::Editing => (),
             },
-            Message::InputChanged(val) => self.write_value = val,
+            Message::InputChanged(val) => self.input_text = val,
             Message::WriteValueSubmit => {
-                if let Ok(value) = from_str_to_u16(self.write_value.as_str()) {
-                    self.value = value;
+                if let Ok(value) = from_str_to_u16(self.input_text.as_str()) {
+                    self.value_write = value;
                     self.state = ValState::Selected;
                     for field in self.fields.iter_mut() {
-                        field.set_value_from_reg(value);
+                        field.set_value_write_from_reg(value);
                     }
                 }
             }
@@ -75,11 +76,12 @@ impl Reg16 {
                 }
                 field::Message::InputChanged(_) => self.fields[index].update(message),
                 field::Message::WriteValueSubmit => {
-                    if let Ok(value) = from_str_to_u16(self.fields[index].write_value.as_str()) {
-                        self.value = self.fields[index].value_reg_from_field(self.value, value);
+                    if let Ok(value) = from_str_to_u16(self.fields[index].input_text.as_str()) {
+                        self.value_write = self.fields[index].value_reg_from_field(self.value_write, value);
+                        self.input_text = from_u16_to_hex(self.value_write);
                         self.fields[index].state = ValState::Selected;
                         for field in self.fields.iter_mut() {
-                            field.set_value_from_reg(self.value)
+                            field.set_value_write_from_reg(self.value_write)
                         }
                     }
                 },
@@ -91,11 +93,19 @@ impl Reg16 {
 
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
         let but_text = if self.expanded { "-" } else { "+" };
-        let read_value = self.value_button();
+        let read_value_str = format!("0x{:04X}", self.value_read);
+        let read_value = text_button(text(read_value_str.clone()));
+        let mut values_column = column![read_value];
+        if self.expanded {
+            values_column = values_column.push(text_input(read_value_str.as_str(), self.input_text.as_str()).id(self.input_id.clone())
+            .width(100)
+            .on_input(Message::InputChanged)
+            .on_submit(Message::WriteValueSubmit));
+        }
         let mut reg = row![
             text_button(but_text).on_press(Message::ToggleExpand),
             text_button(self.name.as_str()),
-            read_value,
+            values_column,
         ]
         .align_y(Top)
         .spacing(10);
@@ -108,15 +118,15 @@ impl Reg16 {
         reg.into()
     }
 
-    fn value_button<'a>(&self) -> Element<'a, Message, Theme, Renderer> {
-        let value = format!("0x{:04X}", self.value);
+    fn _value_button<'a>(&self) -> Element<'a, Message, Theme, Renderer> {
+        let value = format!("0x{:04X}", self.value_read);
         let val_but = button(text(value.clone()))
             .style(button::text)
             .padding(0)
             .on_press(Message::Select(self.input_id.clone()));
         match self.state {
             ValState::Editing => {
-                let val_input = text_input(value.as_str(), self.write_value.as_str())
+                let val_input = text_input(value.as_str(), from_u16_to_hex(self.value_write).as_str())
                     .id(self.input_id.clone())
                     .width(100)
                     .on_input(Message::InputChanged)
@@ -149,4 +159,8 @@ fn from_str_to_u16(src: &str) -> Result<u16, ParseIntError> {
     } else {
         src.parse::<u16>()
     }
+}
+
+fn from_u16_to_hex(src: u16) -> String {
+    format!("0x{:04X}", src)
 }
