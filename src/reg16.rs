@@ -1,7 +1,6 @@
 use std::num::ParseIntError;
 
-use iced::alignment::Vertical::Top;
-use iced::widget::{button, column, row, text, text_input, Button};
+use iced::widget::{button, center, column, row, text, text_input, Button};
 use iced::{color, Element, Renderer, Task, Theme};
 
 use crate::field;
@@ -28,6 +27,8 @@ pub struct Reg16 {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    Read,
+    Write,
     ToggleExpand,
     Select(text_input::Id),
     InputChanged(String),
@@ -77,16 +78,19 @@ impl Reg16 {
                 field::Message::InputChanged(_) => self.fields[index].update(message),
                 field::Message::WriteValueSubmit => {
                     if let Ok(value) = from_str_to_u16(self.fields[index].input_text.as_str()) {
-                        self.value_write = self.fields[index].value_reg_from_field(self.value_write, value);
+                        self.value_write =
+                            self.fields[index].value_reg_from_field(self.value_write, value);
                         self.input_text = from_u16_to_hex(self.value_write);
                         self.fields[index].state = ValState::Selected;
                         for field in self.fields.iter_mut() {
                             field.set_value_write_from_reg(self.value_write)
                         }
                     }
-                },
-                _ => self.fields[index].update(message)
+                }
+                _ => self.fields[index].update(message),
             },
+            Message::Read => (),
+            Message::Write => (),
         }
         Task::none()
     }
@@ -95,24 +99,31 @@ impl Reg16 {
         let but_text = if self.expanded { "-" } else { "+" };
         let read_value_str = format!("0x{:04X}", self.value_read);
         let read_value = text_button(text(read_value_str.clone()));
+
         let mut values_column = column![read_value];
         if self.expanded {
-            values_column = values_column.push(text_input(read_value_str.as_str(), self.input_text.as_str()).id(self.input_id.clone())
-            .width(100)
-            .on_input(Message::InputChanged)
-            .on_submit(Message::WriteValueSubmit));
+            values_column = values_column.push(
+                text_input(read_value_str.as_str(), self.input_text.as_str())
+                    .id(self.input_id.clone())
+                    .width(70)
+                    .on_input(Message::InputChanged)
+                    .on_submit(Message::WriteValueSubmit),
+            ).spacing(5);
         }
         let mut reg = row![
             text_button(but_text).on_press(Message::ToggleExpand),
             text_button(self.name.as_str()),
             values_column,
-        ]
-        .align_y(Top)
-        .spacing(10);
+        ].spacing(10);
         if self.expanded {
             let fields_col = column(self.fields.iter().map(Field::view).enumerate().map(
                 |(index, field)| field.map(move |message| Message::FieldChanged(index, message)),
             ));
+            let button_col = column![
+                button(center(text("R"))).height(25).width(25).padding(0).on_press(Message::Read),
+                button(center(text("W"))).height(25).width(25).padding(0).on_press(Message::Write)
+            ].spacing(5);
+            reg = reg.push(button_col);
             reg = reg.push(fields_col);
         }
         reg.into()
@@ -126,11 +137,12 @@ impl Reg16 {
             .on_press(Message::Select(self.input_id.clone()));
         match self.state {
             ValState::Editing => {
-                let val_input = text_input(value.as_str(), from_u16_to_hex(self.value_write).as_str())
-                    .id(self.input_id.clone())
-                    .width(100)
-                    .on_input(Message::InputChanged)
-                    .on_submit(Message::WriteValueSubmit);
+                let val_input =
+                    text_input(value.as_str(), from_u16_to_hex(self.value_write).as_str())
+                        .id(self.input_id.clone())
+                        .width(100)
+                        .on_input(Message::InputChanged)
+                        .on_submit(Message::WriteValueSubmit);
                 column![val_but, val_input,].into()
             }
             ValState::None => val_but.into(),

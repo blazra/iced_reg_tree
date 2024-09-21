@@ -85,8 +85,8 @@ impl App {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Reg(idx, msg) => {
-                if let reg16::Message::Select(id) = msg {
+            Message::Reg(idx, msg) => match msg {
+                reg16::Message::Select(id) => {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         if idx != j {
                             reg.state = ValState::None;
@@ -95,11 +95,10 @@ impl App {
                             field.state = ValState::None;
                         }
                     }
-                    self.regs[idx].update(reg16::Message::Select(id.clone()));
+                    let _ = self.regs[idx].update(reg16::Message::Select(id.clone()));
                     return text_input::focus(id.clone());
-                } else if let reg16::Message::FieldChanged(field_idx, field::Message::Select(id)) =
-                    msg
-                {
+                }, 
+                reg16::Message::FieldChanged(field_idx, field::Message::Select(id)) => {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         reg.state = ValState::None;
                         for (k, field) in reg.fields.iter_mut().enumerate() {
@@ -108,14 +107,15 @@ impl App {
                             }
                         }
                     }
-                    self.regs[idx].update(reg16::Message::FieldChanged(
+                    let _ = self.regs[idx].update(reg16::Message::FieldChanged(
                         field_idx,
                         field::Message::Select(id.clone()),
                     ));
                     return text_input::focus(id.clone());
-                } else {
-                    self.regs[idx].update(msg);
-                }
+                },
+                reg16::Message::Read => println!("Read {}", self.regs[idx].name),
+                reg16::Message::Write => println!("Write {}", self.regs[idx].name),
+                _ => { let _ = self.regs[idx].update(msg);},
             }
         }
         Task::none()
