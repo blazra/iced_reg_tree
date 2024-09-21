@@ -39,7 +39,7 @@ pub struct ComboBox<
     state: &'a State<T>,
     text_input: TextInput<'a, TextInputEvent, Theme, Renderer>,
     font: Option<Renderer::Font>,
-    selection: text_input::Value,
+    _selection: text_input::Value,
     on_selected: Box<dyn Fn(T) -> Message>,
     on_option_hovered: Option<Box<dyn Fn(T) -> Message>>,
     on_close: Option<Message>,
@@ -74,7 +74,7 @@ where
             state,
             text_input,
             font: None,
-            selection: text_input::Value::new(&selection),
+            _selection: text_input::Value::new(&selection),
             on_selected: Box::new(on_selected),
             on_option_hovered: None,
             on_input: None,
@@ -184,27 +184,6 @@ where
         self
     }
 
-    /// Sets the style class of the input of the [`ComboBox`].
-    #[cfg(feature = "advanced")]
-    #[must_use]
-    pub fn input_class(
-        mut self,
-        class: impl Into<<Theme as text_input::Catalog>::Class<'a>>,
-    ) -> Self {
-        self.text_input = self.text_input.class(class);
-        self
-    }
-
-    /// Sets the style class of the menu of the [`ComboBox`].
-    #[cfg(feature = "advanced")]
-    #[must_use]
-    pub fn menu_class(
-        mut self,
-        class: impl Into<<Theme as menu::Catalog>::Class<'a>>,
-    ) -> Self {
-        self.menu_class = class.into();
-        self
-    }
 }
 
 /// The local state of a [`ComboBox`].
@@ -384,7 +363,6 @@ where
         _renderer: &Renderer,
         _limits: &layout::Limits,
     ) -> layout::Node {
-        let is_focused = true;
 
         layout::Node::new(Size { width: 100.0, height: 0.0 })
     }
