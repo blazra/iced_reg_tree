@@ -88,10 +88,10 @@ impl Field {
         };
         let field_val_write = match self.width {
             1 => format!("{}", self.value_write),
-            2..=4 => format!("0x{:01X}", self.value_read),
-            5..=8 => format!("0x{:02X}", self.value_read),
-            9..=12 => format!("0x{:03X}", self.value_read),
-            13..=16 => format!("0x{:04X}", self.value_read),
+            2..=4 => format!("0x{:01X}", self.value_write),
+            5..=8 => format!("0x{:02X}", self.value_write),
+            9..=12 => format!("0x{:03X}", self.value_write),
+            13..=16 => format!("0x{:04X}", self.value_write),
             _ => unreachable!(),
         };
         let enum_combobox = ComboBox::new(&self.enum_combo_state, "placeholder", self.selected_enum.as_ref(), Message::ValSelected)
