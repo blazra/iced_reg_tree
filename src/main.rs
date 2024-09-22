@@ -6,9 +6,9 @@ use std::io::Read;
 use iced::widget::{column, text_input, Column};
 use iced::{Font, Task};
 
+pub mod combo_box;
 pub mod field;
 pub mod reg16;
-pub mod combo_box;
 
 use field::Field;
 use reg16::{EnumValue, Reg16, ValState};
@@ -86,7 +86,7 @@ impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Reg(idx, msg) => match msg {
-                reg16::Message::Select(id) => {
+                reg16::Message::Select => {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         if idx != j {
                             reg.state = ValState::None;
@@ -95,9 +95,9 @@ impl App {
                             field.state = ValState::None;
                         }
                     }
-                    let _ = self.regs[idx].update(reg16::Message::Select(id.clone()));
-                    return text_input::focus(id.clone());
-                }, 
+                    let _ = self.regs[idx].update(reg16::Message::Select);
+                    return text_input::focus(self.regs[idx].input_id.clone());
+                }
                 reg16::Message::FieldChanged(field_idx, field::Message::Select(id)) => {
                     for (j, reg) in self.regs.iter_mut().enumerate() {
                         reg.state = ValState::None;
@@ -112,11 +112,17 @@ impl App {
                         field::Message::Select(id.clone()),
                     ));
                     return text_input::focus(id.clone());
+                }
+                _ => match self.regs[idx].update(msg) {
+                    reg16::Action::None => (),
+                    reg16::Action::Read => println!("Read {}", self.regs[idx].name),
+                    reg16::Action::Write => println!(
+                        "Write 0x{:04X} to {}",
+                        self.regs[idx].value_write, self.regs[idx].name
+                    ),
+                    reg16::Action::Run(task) => return task.map(move |msg| Message::Reg(idx, msg)),
                 },
-                reg16::Message::Read => println!("Read {}", self.regs[idx].name),
-                reg16::Message::Write => println!("Write {}", self.regs[idx].name),
-                _ => { let _ = self.regs[idx].update(msg);},
-            }
+            },
         }
         Task::none()
     }

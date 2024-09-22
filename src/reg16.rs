@@ -25,12 +25,19 @@ pub struct Reg16 {
     pub input_id: text_input::Id,
 }
 
+pub enum Action {
+    None,
+    Read,
+    Write,
+    Run(Task<Message>),
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     Read,
     Write,
     ToggleExpand,
-    Select(text_input::Id),
+    Select,
     InputChanged(String),
     WriteValueSubmit,
     FieldChanged(usize, field::Message),
@@ -44,19 +51,22 @@ pub struct EnumValue {
 }
 
 impl Reg16 {
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
-            Message::ToggleExpand => self.expanded = !self.expanded,
-            Message::Select(id) => match self.state {
-                ValState::None => {
-                    self.state = ValState::Selected;
-                    return text_input::focus(id);
-                }
-                ValState::Selected => self.state = ValState::Editing,
-                ValState::Editing => (),
+            Message::ToggleExpand => {
+                self.expanded = !self.expanded;
+                Action::None
             },
-            Message::InputChanged(val) => self.input_text = val,
-            Message::WriteValueSubmit => {
+            Message::Select => {
+                match self.state {
+                    ValState::None => self.state = ValState::Selected,
+                    ValState::Selected => self.state = ValState::Selected,
+                    ValState::Editing => self.state = ValState::Selected,
+                };
+                Action::None
+            },
+            Message::InputChanged(val) => {
+                self.input_text = val;
                 if let Ok(value) = from_str_to_u16(self.input_text.as_str()) {
                     self.value_write = value;
                     self.state = ValState::Selected;
@@ -64,6 +74,10 @@ impl Reg16 {
                         field.set_value_write_from_reg(value);
                     }
                 }
+                Action::None
+            },
+            Message::WriteValueSubmit => {
+                Action::Write
             }
             Message::FieldChanged(index, message) => match message {
                 field::Message::Select(id) => {
@@ -74,38 +88,47 @@ impl Reg16 {
                             field.state = ValState::None;
                         }
                     }
+                    Action::None
                 }
-                field::Message::InputChanged(_) => self.fields[index].update(message),
+                field::Message::InputChanged(_) => {
+                    self.fields[index].update(message);
+                    Action::None
+                },
                 field::Message::WriteValueSubmit => {
                     if let Ok(value) = from_str_to_u16(self.fields[index].input_text.as_str()) {
                         self.value_write =
                             self.fields[index].value_reg_from_field(self.value_write, value);
                         self.input_text = from_u16_to_hex(self.value_write);
-                        self.fields[index].state = ValState::Selected;
+                        self.fields[index].state = ValState::None;
                         for field in self.fields.iter_mut() {
                             field.set_value_write_from_reg(self.value_write)
                         }
+                        Action::Run(text_input::focus(self.input_id.clone()))
+                    } else {
+                        Action::None
                     }
-                }
-                _ => self.fields[index].update(message),
+                },
+                _ => {
+                    self.fields[index].update(message);
+                    Action::None
+                },
             },
-            Message::Read => (),
-            Message::Write => (),
+            Message::Read => Action::Read,
+            Message::Write => Action::Write,
         }
-        Task::none()
     }
 
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
         let but_text = if self.expanded { "-" } else { "+" };
         let read_value_str = format!("0x{:04X}", self.value_read);
-        let read_value = text_button(text(read_value_str.clone()));
+        let read_value = text_button(text(read_value_str.clone())).on_press(Message::Select);
 
         let mut values_column = column![read_value];
         if self.expanded {
             values_column = values_column.push(
                 text_input(read_value_str.as_str(), self.input_text.as_str())
                     .id(self.input_id.clone())
-                    .width(70)
+                    .width(80)
                     .on_input(Message::InputChanged)
                     .on_submit(Message::WriteValueSubmit),
             ).spacing(5);
@@ -134,7 +157,7 @@ impl Reg16 {
         let val_but = button(text(value.clone()))
             .style(button::text)
             .padding(0)
-            .on_press(Message::Select(self.input_id.clone()));
+            .on_press(Message::Select);
         match self.state {
             ValState::Editing => {
                 let val_input =

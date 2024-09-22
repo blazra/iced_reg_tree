@@ -124,7 +124,7 @@ impl Field {
         let mut field_row = row![text_button(self.name.as_str()), field_val,].spacing(10);
         field_row = field_row.push_maybe(enum_value_read);
         if self.value_write != self.value_read {
-            field_row = field_row.push("->");
+            field_row = field_row.push("→");
             field_row = field_row.push(text(field_val_write));
             field_row = field_row.push_maybe(enum_value_write);
         }
