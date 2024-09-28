@@ -56,7 +56,7 @@ impl Reg16 {
             Message::ToggleExpand => {
                 self.expanded = !self.expanded;
                 Action::None
-            },
+            }
             Message::Select => {
                 match self.state {
                     ValState::None => self.state = ValState::Selected,
@@ -64,7 +64,7 @@ impl Reg16 {
                     ValState::Editing => self.state = ValState::Selected,
                 };
                 Action::None
-            },
+            }
             Message::InputChanged(val) => {
                 self.input_text = val;
                 if let Ok(value) = from_str_to_u16(self.input_text.as_str()) {
@@ -75,9 +75,18 @@ impl Reg16 {
                     }
                 }
                 Action::None
-            },
+            }
             Message::WriteValueSubmit => {
-                Action::Write
+                if let Ok(value) = from_str_to_u16(self.input_text.as_str()) {
+                    self.value_write = value;
+                    self.state = ValState::Selected;
+                    for field in self.fields.iter_mut() {
+                        field.set_value_write_from_reg(value);
+                    }
+                    Action::Write
+                } else {
+                    Action::None
+                }
             }
             Message::FieldChanged(index, message) => match message {
                 field::Message::Select(id) => {
@@ -93,7 +102,7 @@ impl Reg16 {
                 field::Message::InputChanged(_) => {
                     self.fields[index].update(message);
                     Action::None
-                },
+                }
                 field::Message::WriteValueSubmit => {
                     if let Ok(value) = from_str_to_u16(self.fields[index].input_text.as_str()) {
                         self.value_write =
@@ -107,14 +116,25 @@ impl Reg16 {
                     } else {
                         Action::None
                     }
-                },
+                }
                 _ => {
                     self.fields[index].update(message);
                     Action::None
-                },
+                }
             },
             Message::Read => Action::Read,
-            Message::Write => Action::Write,
+            Message::Write => {
+                if let Ok(value) = from_str_to_u16(self.input_text.as_str()) {
+                    self.value_write = value;
+                    self.state = ValState::Selected;
+                    for field in self.fields.iter_mut() {
+                        field.set_value_write_from_reg(value);
+                    }
+                    Action::Write
+                } else {
+                    Action::None
+                }
+            }
         }
     }
 
@@ -125,28 +145,41 @@ impl Reg16 {
 
         let mut values_column = column![read_value];
         if self.expanded {
-            values_column = values_column.push(
-                text_input(read_value_str.as_str(), self.input_text.as_str())
-                    .id(self.input_id.clone())
-                    .width(80)
-                    .on_input(Message::InputChanged)
-                    .on_submit(Message::WriteValueSubmit),
-            ).spacing(5);
+            values_column = values_column
+                .push(
+                    text_input(read_value_str.as_str(), self.input_text.as_str())
+                        .id(self.input_id.clone())
+                        .width(80)
+                        .on_input(Message::InputChanged)
+                        .on_submit(Message::WriteValueSubmit),
+                )
+                .spacing(5);
         }
         let mut reg = row![
             text_button(but_text).on_press(Message::ToggleExpand),
             text_button(self.name.as_str()),
             values_column,
-        ].spacing(10);
+        ]
+        .spacing(10);
         if self.expanded {
-            let field_names_col = column(self.fields.iter().map(|field| field.name.as_str().into()));
+            let field_names_col =
+                column(self.fields.iter().map(|field| field.name.as_str().into()));
             let fields_col = column(self.fields.iter().map(Field::view).enumerate().map(
                 |(index, field)| field.map(move |message| Message::FieldChanged(index, message)),
             ));
             let button_col = column![
-                button(center(text("R"))).height(25).width(25).padding(0).on_press(Message::Read),
-                button(center(text("W"))).height(25).width(25).padding(0).on_press(Message::Write)
-            ].spacing(5);
+                button(center(text("R")))
+                    .height(25)
+                    .width(25)
+                    .padding(0)
+                    .on_press(Message::Read),
+                button(center(text("W")))
+                    .height(25)
+                    .width(25)
+                    .padding(0)
+                    .on_press(Message::Write)
+            ]
+            .spacing(5);
             reg = reg.push(button_col);
             reg = reg.push(field_names_col);
             reg = reg.push(fields_col);
