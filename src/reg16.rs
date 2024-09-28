@@ -139,6 +139,7 @@ impl Reg16 {
             values_column,
         ].spacing(10);
         if self.expanded {
+            let field_names_col = column(self.fields.iter().map(|field| field.name.as_str().into()));
             let fields_col = column(self.fields.iter().map(Field::view).enumerate().map(
                 |(index, field)| field.map(move |message| Message::FieldChanged(index, message)),
             ));
@@ -147,6 +148,7 @@ impl Reg16 {
                 button(center(text("W"))).height(25).width(25).padding(0).on_press(Message::Write)
             ].spacing(5);
             reg = reg.push(button_col);
+            reg = reg.push(field_names_col);
             reg = reg.push(fields_col);
         }
         reg.into()
